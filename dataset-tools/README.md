@@ -36,7 +36,7 @@ python evaluate.py --data-dir ../dataset
 | Script | What it does |
 |---|---|
 | `organize_dataset.py` | Groups images by filename prefix + perceptual hash, splits whole groups 70/15/15, removes near-duplicates inside a group, resizes to 1024 px, writes `split_manifest.json`. |
-| `augment_duplicates.py` | Creates crop/flip/brightness/recompression/rotation/watermark/screenshot variants of genuine photos in the **same split**, and builds `dataset/duplicate_test/{originals,variants}`. |
+| `augment_duplicates.py` | Creates crop/flip/brightness/recompression/rotation/watermark/screenshot variants of genuine photos in the **same split**, rejects any variant that would be a near-duplicate of an image in another split, and builds `dataset/duplicate_test/{originals,variants}`. |
 | `dataset_stats.py` | Class balance, image sizes, duplicate clusters, cross-split leakage; exits 1 on leakage. |
 | `download_helper.md` | Legal/ethical collection guide, 3-member plan, labelling checklist, roadmap. |
 

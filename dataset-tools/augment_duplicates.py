@@ -21,10 +21,13 @@ import random
 from datetime import datetime, timezone
 from pathlib import Path
 
+import imagehash
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 SPLITS = ("train", "val", "test")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+# Match dataset_stats.py so a generated variant can never create a cross-split leak.
+NEAR_DUPLICATE_DISTANCE = 4
 VARIANTS = (
     "crop_resize",
     "flip",
@@ -128,6 +131,39 @@ def load_manifest(dataset: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def _dhash(image: Image.Image) -> imagehash.ImageHash:
+    return imagehash.dhash(ImageOps.exif_transpose(image).convert("RGB"), hash_size=8)
+
+
+def _dhash_path(path: Path) -> imagehash.ImageHash | None:
+    try:
+        with Image.open(path) as opened:
+            return _dhash(opened)
+    except Exception:
+        return None
+
+
+def _existing_hashes(dataset: Path) -> list[tuple[str, imagehash.ImageHash]]:
+    """Hashes of committed split images, used to reject a variant that would leak."""
+    result: list[tuple[str, imagehash.ImageHash]] = []
+    for split in SPLITS:
+        for label in ("genuine", "stock_or_reused"):
+            folder = dataset / split / label
+            if not folder.exists():
+                continue
+            for path in sorted(folder.iterdir()):
+                if path.suffix.lower() not in IMAGE_EXTENSIONS:
+                    continue
+                digest = _dhash_path(path)
+                if digest is not None:
+                    result.append((split, digest))
+    return result
+
+
+def _would_leak(digest: imagehash.ImageHash, split: str, existing: list[tuple[str, imagehash.ImageHash]]) -> bool:
+    return any(other_split != split and (digest - other) <= NEAR_DUPLICATE_DISTANCE for other_split, other in existing)
+
+
 def augment(dataset: Path, copies: int = 3, seed: int = 42, duplicate_test_limit: int = 40) -> dict:
     dataset = Path(dataset)
     manifest = load_manifest(dataset)
@@ -136,11 +172,18 @@ def augment(dataset: Path, copies: int = 3, seed: int = 42, duplicate_test_limit
     }
 
     created: list[dict] = []
+    skipped_leakage: list[dict] = []
     originals_for_duplicate_test: list[tuple[str, Path]] = []
 
-    # Reruns should not duplicate manifest entries.
+    # Reruns should not duplicate files or manifest entries.
     for group in manifest.get("groups", []):
         group["outputFiles"] = [path for path in group.get("outputFiles", []) if "__aug" not in Path(path).stem]
+    for split in SPLITS:
+        stock_dir = dataset / split / "stock_or_reused"
+        if stock_dir.exists():
+            for stale in stock_dir.glob("*__aug*.jpg"):
+                stale.unlink()
+    existing = _existing_hashes(dataset)
 
     for split in SPLITS:
         genuine_dir = dataset / split / "genuine"
@@ -158,7 +201,17 @@ def augment(dataset: Path, copies: int = 3, seed: int = 42, duplicate_test_limit
                 variant, operations = make_variant(base, rng)
                 destination = stock_dir / f"{source.stem}__aug{index}.jpg"
                 variant.save(destination, format="JPEG", quality=88, optimize=True)
+                # Hash the saved JPEG: recompression can move a perceptual hash slightly, and the
+                # leakage gate in dataset_stats.py must see exactly the same bytes.
+                digest = _dhash_path(destination)
+                if digest is None or _would_leak(digest, split, existing):
+                    destination.unlink(missing_ok=True)
+                    skipped_leakage.append(
+                        {"source": str(source.relative_to(dataset)), "split": split, "operations": operations}
+                    )
+                    continue
                 relative = str(destination.relative_to(dataset))
+                existing.append((split, digest))
                 created.append(
                     {"source": str(source.relative_to(dataset)), "output": relative, "operations": operations, "split": split}
                 )
@@ -182,12 +235,16 @@ def augment(dataset: Path, copies: int = 3, seed: int = 42, duplicate_test_limit
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "copiesPerOriginal": copies,
         "variantsCreated": len(created),
+        "variantsSkippedForLeakage": len(skipped_leakage),
         "duplicateTestPairs": len(duplicate_pairs),
         "variants": created,
+        "skippedLeakage": skipped_leakage,
     }
     (dataset / "augmentation_manifest.json").write_text(json.dumps(report, indent=2))
 
     print(f"Created {len(created)} variants in dataset/*/stock_or_reused (same split as source).")
+    if skipped_leakage:
+        print(f"Skipped {len(skipped_leakage)} variants that were too close to an image in another split.")
     print(f"Created {len(duplicate_pairs)} original/variant pairs in dataset/duplicate_test.")
     print("Wrote dataset/augmentation_manifest.json")
     return report

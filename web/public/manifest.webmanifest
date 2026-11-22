@@ -1,0 +1,16 @@
+{
+  "name": "RentSaathi — Verified rooms for students",
+  "short_name": "RentSaathi",
+  "description": "AI-powered verified house and room rental platform for students in Pakistan.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFFCFA",
+  "theme_color": "#A20224",
+  "lang": "en",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

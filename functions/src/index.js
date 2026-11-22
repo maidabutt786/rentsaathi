@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { onDocumentDeleted, onDocumentWritten } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentDeleted, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { logger } from "firebase-functions";
@@ -163,6 +163,38 @@ export const onListingDelete = onDocumentDeleted(
     logger.info("[rentsaathi] Listing cleanup done", { listingId });
   },
 );
+
+export const onChatCreate = onDocumentCreated(
+  { document: "chats/{chatId}", retry: true },
+  async (event) => {
+    const chat = event.data?.data();
+    if (!chat?.listingId) return;
+    try {
+      await db.collection("listings").doc(chat.listingId).update({
+        enquiryCount: FieldValue.increment(1),
+      });
+    } catch (error) {
+      logger.warn("[rentsaathi] Could not increment enquiry count", {
+        listingId: chat.listingId,
+        error: error.message,
+      });
+    }
+  },
+);
+
+export const incrementListingView = onCall({ memory: "128MiB", timeoutSeconds: 30 }, async (request) => {
+  const listingId = request.data?.listingId;
+  if (typeof listingId !== "string" || listingId.length === 0 || listingId.length > 128) {
+    throw new HttpsError("invalid-argument", "listingId is required.");
+  }
+  try {
+    await db.collection("listings").doc(listingId).update({ viewCount: FieldValue.increment(1) });
+    return { listingId, counted: true };
+  } catch (error) {
+    logger.warn("[rentsaathi] Could not increment view count", { listingId, error: error.message });
+    return { listingId, counted: false };
+  }
+});
 
 async function assertAdmin(request) {
   if (!request.auth) {

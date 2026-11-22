@@ -32,13 +32,17 @@ service cloud.firestore {
       allow read: if isSelf(userId) || isAdmin();
       allow create: if isSelf(userId)
         && request.resource.data.role in ['student', 'landlord']
-        && request.resource.data.verificationStatus == 'pending'
+        && request.resource.data.verificationStatus in ['pending', 'approved']
+        && (request.resource.data.role == 'landlord'
+            ? request.resource.data.verificationStatus == 'pending'
+            : request.resource.data.verificationStatus == 'approved')
         && request.resource.data.suspended == false;
       allow update: if isAdmin()
         || (isSelf(userId)
             && request.resource.data.role == resource.data.role
-            && request.resource.data.verificationStatus == resource.data.verificationStatus
-            && request.resource.data.suspended == resource.data.suspended);
+            && request.resource.data.suspended == resource.data.suspended
+            && (request.resource.data.verificationStatus == resource.data.verificationStatus
+                || (resource.data.role == 'landlord' && request.resource.data.verificationStatus == 'pending')));
       allow delete: if isAdmin();
     }
 
@@ -52,11 +56,14 @@ service cloud.firestore {
         && request.resource.data.price >= 0
         && request.resource.data.images.size() <= 15
         && request.resource.data.genderRule in ['boys', 'girls', 'any']
-        && request.resource.data.roomType in ['single', 'shared', 'apartment', 'hostel'];
+        && request.resource.data.roomType in ['single', 'shared', 'apartment', 'hostel', 'house']
+        && (!('ai' in request.resource.data) || request.resource.data.ai == null);
       allow update: if isAdmin()
         || (isOwner(resource)
             && request.resource.data.ownerId == resource.data.ownerId
-            && request.resource.data.status in ['active', 'paused', 'removed']);
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.status in ['active', 'paused', 'removed']
+            && request.resource.data.ai == resource.data.ai);
       allow delete: if isOwner(resource) || isAdmin();
     }
 
