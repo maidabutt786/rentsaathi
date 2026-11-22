@@ -1,0 +1,35 @@
+{
+  "available": true,
+  "mode": "trained",
+  "generatedAt": "2026-11-22T20:46:00.428833+00:00",
+  "modelVersion": "image-cnn-efficientnet_b0-202611222045",
+  "backbone": "efficientnet_b0",
+  "classifier": {
+    "split": "test",
+    "threshold": 0.5,
+    "labels": [
+      "genuine",
+      "stock_or_reused"
+    ],
+    "samples": 23,
+    "accuracy": 0.913,
+    "precision": 1.0,
+    "recall": 0.75,
+    "f1": 0.8571,
+    "confusionMatrix": [
+      [
+        15,
+        0
+      ],
+      [
+        2,
+        6
+      ]
+    ],
+    "rocAuc": 1.0
+  },
+  "duplicateDetection": {
+    "available": false,
+    "reason": "dataset/duplicate_test/{originals,variants} not found"
+  }
+}
