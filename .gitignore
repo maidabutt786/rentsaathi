@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+serviceAccount*.json
+*-service-account*.json
+firebase-adminsdk*.json
+.secret.local
+
+# Build output
+dist/
+build/
+web/dist/
+coverage/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# AI models & datasets (never commit weights or data)
+dataset/
+!dataset/.gitkeep
+raw/
+!raw/.gitkeep
+models/*.pt
+models/*.pth
+models/*.onnx
+models/*.pkl
+*.pt
+*.pth
+*.onnx
+
+# Firebase emulator / debug logs
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+.firebase/
+functions/.env
+web/.env
+ai-service/.env
+.emulator-data/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Test / tooling artifacts
+.agent_tmp/
+ai-service/reports/*.png
+!ai-service/reports/.gitkeep

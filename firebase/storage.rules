@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function underSizeLimit() {
+      return request.resource.size < 8 * 1024 * 1024;
+    }
+
+    // Public listing photos: anyone can view, only the owner can upload/delete.
+    // Path is listings/{ownerUid}/{listingId}/{fileName}.
+    match /listings/{ownerUid}/{listingId}/{fileName} {
+      allow read: if true;
+      allow write: if signedIn()
+        && request.auth.uid == ownerUid
+        && isImage()
+        && underSizeLimit();
+      allow delete: if signedIn() && request.auth.uid == ownerUid;
+    }
+
+    // Verification documents (CNIC / ownership): private.
+    match /verification/{userId}/{fileName} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow write: if signedIn()
+        && request.auth.uid == userId
+        && underSizeLimit()
+        && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+    }
+
+    match /avatars/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == userId && isImage() && underSizeLimit();
+    }
+  }
+}
